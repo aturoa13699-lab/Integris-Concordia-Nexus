@@ -1,0 +1,63 @@
+# Create _CoqProject file
+cat > coq/_CoqProject << 'EOF'
+-R theories Integris
+
+theories/Canonicalization.v
+theories/V2_Decision_Application.v
+theories/V2_Rollback.v
+theories/Extractor.v
+EOF
+
+# Create placeholder proof files
+cat > coq/theories/Canonicalization.v << 'EOF'
+(** * Concordia Protocol: Canonicalization
+    
+    This module defines canonical JSON representation and proves
+    that structurally equivalent artifacts produce identical CIDs.
+*)
+
+Require Import Coq.Strings.String.
+Require Import Coq.Lists.List.
+Import ListNotations.
+
+(** JSON abstract syntax *)
+Inductive json : Type :=
+| JNull : json
+| JBool : bool -> json
+| JNumber : nat -> json
+| JString : string -> json
+| JArray : list json -> json
+| JObject : list (string * json) -> json.
+
+(** Canonicalization predicate *)
+Inductive canonical : json -> Prop :=
+| Can_Null : canonical JNull
+| Can_Bool : forall b, canonical (JBool b)
+| Can_Number : forall n, canonical (JNumber n)
+| Can_String : forall s, canonical (JString s)
+| Can_Array : forall arr,
+    Forall canonical arr ->
+    canonical (JArray arr)
+| Can_Object : forall kvs,
+    Forall (fun '(k,v) => canonical v) kvs ->
+    canonical (JObject kvs).
+
+(** TODO: Complete canonicalization function and proofs *)
+Parameter canonicalize : json -> json.
+Parameter generate_cid : json -> string.
+
+(** Theorem: CID stability *)
+Axiom cid_stability : forall j1 j2,
+  canonical j1 ->
+  canonical j2 ->
+  (* If j1 and j2 are structurally equivalent *)
+  j1 = j2 ->
+  generate_cid j1 = generate_cid j2.
+
+(** NOTE: This is a placeholder. Real proofs coming soon. *)
+EOF
+
+# Create other placeholder files
+touch coq/theories/V2_Decision_Application.v
+touch coq/theories/V2_Rollback.v
+touch coq/theories/Extractor.v
