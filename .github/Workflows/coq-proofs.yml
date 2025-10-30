@@ -1,0 +1,77 @@
+name: Verify Coq Proofs
+
+on:
+push:
+branches: [ main, develop ]
+pull_request:
+branches: [ main ]
+
+jobs:
+verify-proofs:
+runs-on: ubuntu-latest
+
+```
+steps:
+- name: Checkout code
+  uses: actions/checkout@v4
+  
+- name: Set up OCaml
+  uses: ocaml/setup-ocaml@v2
+  with:
+    ocaml-compiler: 4.14.1
+    
+- name: Install Coq
+  run: |
+    opam install -y coq.8.18.0
+    
+- name: Cache Coq build
+  uses: actions/cache@v3
+  with:
+    path: |
+      coq/_build
+      ~/.opam
+    key: ${{ runner.os }}-coq-${{ hashFiles('coq/_CoqProject', 'coq/theories/**/*.v') }}
+    restore-keys: |
+      ${{ runner.os }}-coq-
+      
+- name: Verify all proofs
+  run: |
+    cd coq
+    make verify
+    
+- name: Check for admitted lemmas
+  run: |
+    if grep -r "Admitted" coq/theories/*.v; then
+      echo "❌ ERROR: Found admitted lemmas in proofs!"
+      echo "All proofs must be complete (Qed.)"
+      exit 1
+    else
+      echo "✅ All proofs verified. Zero admitted lemmas."
+    fi
+    
+- name: Generate proof statistics
+  run: |
+    cd coq
+    coqwc theories/*.v > proof_stats.txt
+    cat proof_stats.txt
+    
+- name: Upload proof statistics
+  uses: actions/upload-artifact@v3
+  with:
+    name: proof-statistics
+    path: coq/proof_stats.txt
+    
+- name: Comment PR with proof stats
+  if: github.event_name == 'pull_request'
+  uses: actions/github-script@v6
+  with:
+    script: |
+      const fs = require('fs');
+      const stats = fs.readFileSync('coq/proof_stats.txt', 'utf8');
+      github.rest.issues.createComment({
+        issue_number: context.issue.number,
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        body: `## ✅ Coq Proofs Verified\n\n\`\`\`\n${stats}\n\`\`\``
+      });
+```
